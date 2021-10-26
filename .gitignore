@@ -1,0 +1,8 @@
+# files para Rust
+debug/
+**/target/
+**/*.rs.bk
+*pbd
+
+# IDEs
+.idea/
