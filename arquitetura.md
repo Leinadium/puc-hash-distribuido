@@ -34,7 +34,7 @@
         "insere--chave--valor" -> chama [calcula], e depois [roteia] ou [coloca]
         "insere_no--chave--valor--no" -> chama [roteia] ou [coloca]
         "consulta--valor--endereço" -> chama [calcula], e depois [roteia] ou [procura]
-        "consulta_no--valor--no--endereco" -> chama [roteia] ou [procura]
+        "consulta_no--valor--endereco--no" -> chama [roteia] ou [procura]
 
 ### Função *calcula(chave)*:
     Calcula o nó destino para a chave, ou seja, se deve rotear a chave ou usar no próprio nó;
