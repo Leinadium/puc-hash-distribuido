@@ -4,6 +4,34 @@ use std::net::{Shutdown, TcpListener, TcpStream};
 use std::io::Read;
 use std::process;
 use std::env;
+use std::thread;
+use std::collections::HashMap;
+use std::sync::mpsc;
+use std::sync::mpsc::{Receiver, RecvError, Sender};
+
+
+
+struct SendHash {
+    /// Estrutura que o loop_hash recebe como mensagem
+    tipo: bool,                         // false para procurar, true para inserir
+    chave: String,                      // chave para procurar ou inserir
+    valor: String,                      // valor para ser inserido (nao é usado se for procurar)
+    endereco: String,                   // endereço para guardar se nao tiver
+    tx_resposta: Sender<ResponseHash>   // sender do canal para responder
+}
+
+struct ResponseHash {
+    /// Estrutura que o loop_hash retorna como mensagem
+    sucesso: bool,                  // true se encontrou ou inseriu com sucesso
+    valor: String,                  // se foi uma busca, retorna o valor
+    vetor: Vec<String>              // se foi uma inserção, retorna uma lista contendo os endereços pra responder
+}
+
+struct EsperaHash {
+    /// Estrutura para a lista de espera de chaves e valores sendo procurados
+    content: String,            // chave ou valor
+    endereco: String,           // endereço de callback
+}
 
 
 fn get_mensagem(mut stream: TcpStream) ->String {
@@ -65,7 +93,62 @@ fn trata(mensagem: String) {
 }
 
 
+fn loop_hash(receiver: Receiver<SendHash>) {
+    /// Loop para thread de alteração da hashlist
+    /// a resposta a ser enviada depende do tipo.
+    /// se for uma procura, retorna o valor encontrado, ou ""
+
+    let mut hashmap: HashMap<String, String> = HashMap::new();
+    let mut esperamap: HashMap<String, Vec<String>> = HashMap::new();
+    while 1 {
+        let m  = receiver.recv();
+        let mensagem_hash = match m {
+            Ok(x) => x,
+            Err(_) => break,            // erro, fecha o loop
+        };
+
+        let mut response = ResponseHash {sucesso: true, valor: "".to_string(), vetor: Vec::new()};
+
+        // procura na hashlist
+        if !mensagem_hash.tipo {
+            if !hashmap.contains_key(mensagem_hash.chave.as_str()) {                                         // se nao tiver na hashlist
+                match esperamap.get(&*mensagem_hash.chave) {                                                 // ve se ja tem isso na fila de espera
+                    None => {                                                                                   // se nao tiver, cria um vetor com o endereco
+                        let mut v: Vec<String> = Vec::new();
+                        v.push(mensagem_hash.endereco);
+                        esperamap.insert(mensagem_hash.chave, v);
+                    }
+                    Some(mut v) => {                                                                // se ja tiver, so coloca
+                        v.push(mensagem_hash.endereco);
+                    }
+                }
+                response.sucesso = false;                                                                       // atualiza a resposta
+            }
+            else {                                                                                              // se tiver na hashlist
+                response.valor = hashmap[mensagem_hash.chave];
+            }
+        }
+        // insere na hashlist
+        else {
+            hashmap.insert(mensagem_hash.chave, mensagem_hash.valor);
+            match esperamap.get(&*mensagem_hash.chave) {                                                 // atualiza a espera
+                None => {}
+                Some(mut hv) => {
+                    for end in hv.iter() {
+                        response.vetor.push((*end.clone()).parse().unwrap());
+                    }
+                    esperamap.remove(&*mensagem_hash.chave);
+                }
+            }
+        }
+        mensagem_hash.tx_resposta.send(response);
+    }
+
+}
+
+
 fn main() {
+    // verificando node e portas
     let args: Vec<String> = env::args().collect();
     if args.len() < 3 {
         println!("usage: {} node_number port", &args[0]);
@@ -83,6 +166,13 @@ fn main() {
         Err(_) => {println!("invalid port argument"); process::exit(0x01);}
     };
 
+    // criando o hash
+    println!("creating channel for hash_loop");
+    let (tx_hash, rx_hash) = mpsc::channel();
+    println!("starting hash thread");
+    thread::spawn(move|| { loop_hash(rx_hash); });
+
+
     // iniciando listener TCP
     let listener = TcpListener::bind(format!("127.0.0.1:{}", port)).unwrap();
     println!("node {} running on port {}", node, port);
@@ -90,7 +180,8 @@ fn main() {
         let stream = stream.unwrap();
         println!("new conn: {}", stream.peer_addr().unwrap());
         let mensagem = get_mensagem(stream);
-        println!("message: {}", mensagem);
-        // TODO: passar mensagem para tratar()
+
+        // trata a mensagem
+        thread::spawn(trata(mensagem));
     }
 }
