@@ -7,7 +7,7 @@ use std::env;
 use std::thread;
 use std::collections::HashMap;
 use std::sync::mpsc;
-use std::sync::mpsc::{Receiver, RecvError, Sender};
+use std::sync::mpsc::{Receiver, Sender};
 
 
 
@@ -50,7 +50,7 @@ fn get_mensagem(mut stream: TcpStream) ->String {
 }
 
 fn trata(mensagem: String) {
-    /// Trata a mensagem, executando as funções abaixo para cada caso:
+    /// Trata a mensagem, executando as funções abaixo para cada caso
     ///   "insere--chave--valor" -> chama *calcula*, e depois *roteia* ou *coloca*
     ///   "insere_no--chave--valor--no" -> chama *roteia* ou *coloca*
     ///   "consulta--valor--endereço" -> chama *calcula*, e depois *roteia* ou *procura*
@@ -63,28 +63,28 @@ fn trata(mensagem: String) {
     // decide para onde ir
     if m.starts_with("insere--") {
         if v.len() != 3 {println!("mensagem de insercao invalida !"); return;}
-        let chave = v[1].to_string();
-        let valor = v[2].to_string();
+        // let chave = v[1].to_string();
+        // let valor = v[2].to_string();
         // TODO: chamar calcula, e depois roteia ou coloca
     }
     else if m.starts_with("insere_no") {
         if v.len() != 4 {println!("mensagem de insercao com no invalida !"); return;}
-        let chave = v[1].to_string();
-        let valor = v[2].to_string();
-        let no = v[3].to_string();
+        // let chave = v[1].to_string();
+        // let valor = v[2].to_string();
+        //let no = v[3].to_string();
         // TODO: chamar roteia ou coloca
     }
     else if m.starts_with("consulta--") {
         if v.len() != 3 {println!("mensagem de insercao invalida !"); return;}
-        let valor = v[1].to_string();
-        let endereco = v[2].to_string();
+        // let valor = v[1].to_string();
+        // let endereco = v[2].to_string();
         // TODO: chamar calcula, e depois roteia ou procura
     }
     else if m.starts_with("consulta_no") {
         if v.len() != 4 {println!("mensagem de insercao com no invalida !"); return;}
-        let valor = v[1].to_string();
-        let endereco = v[2].to_string();
-        let no = v[3].to_string();
+        // let valor = v[1].to_string();
+        // let endereco = v[2].to_string();
+        // let no = v[3].to_string();
         // TODO: chama roteia ou procura
     }
     else {
@@ -99,51 +99,44 @@ fn loop_hash(receiver: Receiver<SendHash>) {
     /// se for uma procura, retorna o valor encontrado, ou ""
 
     let mut hashmap: HashMap<String, String> = HashMap::new();
-    let mut esperamap: HashMap<String, Vec<String>> = HashMap::new();
-    while 1 {
-        let m  = receiver.recv();
+    let mut espera_list: Vec<EsperaHash> = Vec::new();
+
+    loop {
+        let m = receiver.recv();
         let mensagem_hash = match m {
             Ok(x) => x,
             Err(_) => break,            // erro, fecha o loop
         };
 
-        let mut response = ResponseHash {sucesso: true, valor: "".to_string(), vetor: Vec::new()};
+        let mut response = ResponseHash { sucesso: true, valor: "".to_string(), vetor: Vec::new() };
 
-        // procura na hashlist
+        // procura na hashmap
         if !mensagem_hash.tipo {
-            if !hashmap.contains_key(mensagem_hash.chave.as_str()) {                                         // se nao tiver na hashlist
-                match esperamap.get(&*mensagem_hash.chave) {                                                 // ve se ja tem isso na fila de espera
-                    None => {                                                                                   // se nao tiver, cria um vetor com o endereco
-                        let mut v: Vec<String> = Vec::new();
-                        v.push(mensagem_hash.endereco);
-                        esperamap.insert(mensagem_hash.chave, v);
-                    }
-                    Some(mut v) => {                                                                // se ja tiver, so coloca
-                        v.push(mensagem_hash.endereco);
-                    }
-                }
-                response.sucesso = false;                                                                       // atualiza a resposta
-            }
-            else {                                                                                              // se tiver na hashlist
-                response.valor = hashmap[mensagem_hash.chave];
+            if hashmap.contains_key(&mensagem_hash.chave) {
+                response.valor = hashmap.get(&mensagem_hash.chave).unwrap().clone();
+            } else {
+                response.sucesso = false;
+                // salvando na espera_list
+                let espera = EsperaHash {content: mensagem_hash.chave, endereco: mensagem_hash.endereco};
+                espera_list.push(espera);
             }
         }
         // insere na hashlist
         else {
-            hashmap.insert(mensagem_hash.chave, mensagem_hash.valor);
-            match esperamap.get(&*mensagem_hash.chave) {                                                 // atualiza a espera
-                None => {}
-                Some(mut hv) => {
-                    for end in hv.iter() {
-                        response.vetor.push((*end.clone()).parse().unwrap());
-                    }
-                    esperamap.remove(&*mensagem_hash.chave);
+            hashmap.insert(mensagem_hash.chave.clone(), mensagem_hash.valor.clone());
+
+            // verificando a lista de espera
+            for valor_esp in espera_list.iter() {
+                if valor_esp.content == mensagem_hash.chave {
+                    response.vetor.push(valor_esp.endereco.clone());
                 }
             }
-        }
-        mensagem_hash.tx_resposta.send(response);
-    }
+            // removendo da lista de espera, se houver
+            espera_list.retain(|x| *x.content != mensagem_hash.chave);
 
+        }
+        mensagem_hash.tx_resposta.send(response).expect("callback fail");
+    }
 }
 
 
@@ -182,6 +175,6 @@ fn main() {
         let mensagem = get_mensagem(stream);
 
         // trata a mensagem
-        thread::spawn(trata(mensagem));
+        thread::spawn(move || {trata(mensagem); });
     }
 }
