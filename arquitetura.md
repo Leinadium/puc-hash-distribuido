@@ -2,7 +2,7 @@
 
 ## Funções da biblioteca
 
-### Função *inicia(n)* :
+### Função *inicia(n, path_para_servidor_exe)* :
     Cria n instâncias do servidor.
     O servidor i ouvirá na porta 5000 + i.
     Cada servidor representa um nó.
@@ -16,7 +16,6 @@
 ### Função *insere(no_inicial, chave, valor)* :
     Abre uma conexão TCP com o respectivo server, enviando uma mensagem contendo a chave e o valor.
     A mensagem enviada deve escapar qualquer "--" contido na string da chave e valor.
-    Assim que confirmar o recebimento, fecha a conexão.
 
 ### Função *consulta(id, no_inicial, chave, endereço)* :
     Abre uma conexão TCP com o respectivo server, enviando uma mensagen contendo 

@@ -6,8 +6,9 @@ use std::process;
 use std::env;
 use std::thread;
 use std::collections::HashMap;
+use std::process::exit;
 use std::sync::mpsc;
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender, SendError};
 
 
 
@@ -55,6 +56,7 @@ fn trata(mensagem: String) {
     ///   "insere_no--chave--valor--no" -> chama *roteia* ou *coloca*
     ///   "consulta--valor--endereço" -> chama *calcula*, e depois *roteia* ou *procura*
     ///   "consulta_no--valor--no--endereco" -> chama *roteia* ou *procura*
+    ///   "fecha" -> fecha o servidor
 
     // retira os escapes
     let m = mensagem.replace("\\--", "--");
@@ -87,6 +89,10 @@ fn trata(mensagem: String) {
         // let no = v[3].to_string();
         // TODO: chama roteia ou procura
     }
+    else if m.starts_with("fecha") {
+        println!("closing server");
+        exit(0);
+    }
     else {
         println!("mensagem invalida !");
     }
@@ -101,13 +107,17 @@ fn loop_hash(receiver: Receiver<SendHash>) {
     let mut hashmap: HashMap<String, String> = HashMap::new();
     let mut espera_list: Vec<EsperaHash> = Vec::new();
 
+    println!("hashloop: listening for operations");
     loop {
         let m = receiver.recv();
         let mensagem_hash = match m {
             Ok(x) => x,
-            Err(_) => break,            // erro, fecha o loop
+            Err(_) => {
+                println!("hashloop: recv error. stopping hashloop");
+                break ;     // erro, fecha o loop
+            },
         };
-
+        println!("hashloop: parsing message");
         let mut response = ResponseHash { sucesso: true, valor: "".to_string(), vetor: Vec::new() };
 
         // procura na hashmap
@@ -135,7 +145,8 @@ fn loop_hash(receiver: Receiver<SendHash>) {
             espera_list.retain(|x| *x.content != mensagem_hash.chave);
 
         }
-        mensagem_hash.tx_resposta.send(response).expect("callback fail");
+        println!("hashloop: finished parsing");
+        mensagem_hash.tx_resposta.send(response).expect("hashloop: callback fail");
     }
 }
 
