@@ -3,12 +3,14 @@
 ## Funções da biblioteca
 
 ### Função *inicia(n, path_para_servidor_exe)* :
+    [pode ser emulada manualmente rodando o servidor com seus argumentos várias vezes]
     Cria n instâncias do servidor.
     O servidor i ouvirá na porta 5000 + i.
     Cada servidor representa um nó.
     Cada servidor é um processo do server
 
 ### Função *fecha(n)* :
+    [pode ser emulada manualmente fazendo varias conexoes TCP com os servidores]
     Fecha os n servidores abertos.
     Tenta abrir uma conexão TCP com cada server em suas respectivas portas,
         enviando uma mensagem de fechar.
