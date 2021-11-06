@@ -1,10 +1,12 @@
-
-mod disthash {
+pub mod disthash {
     use std::io::Write;
     use std::net::{Shutdown, TcpStream};
     use std::process::Command;
+
+
     pub fn inicia(n: i32, path_para_servidor: &String) {
         /// Inicia os nós. Cada nó é um processo rodando server
+
         let porta = 7000;
         let no = 0;
 
@@ -76,7 +78,6 @@ mod tests {
         inicia(1, &path.to_string());
     }
 
-    #[test]
     fn teste_fecha() {
         let path = "C:\\Users\\Daniel\\IdeaProjects\\puc-hash-distribuido\\server\\target\\release\\server.exe";
         inicia(1, &path.to_string());

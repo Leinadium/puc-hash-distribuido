@@ -2,10 +2,20 @@
 
 use std::net::{TcpStream};
 use std::io::{Read, Write};
-use std::process;
+use std::{env, process};
 use std::io;
 
+use api::disthash;
+
 fn main() {
+    let args:  Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        println!("usage: {} path_to_server_executable", &args[0]);
+        process::exit(0x01);
+    }
+}
+
+fn main_antiga() {
     let mut buffer = String::new();
 
     println!("Digite a porta para enviar uma mensagem: ");
