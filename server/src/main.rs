@@ -1,8 +1,8 @@
 /* server */
 
 use std::net::{Shutdown, TcpListener, TcpStream};
-use std::io::Read;
-use std::fmt::Write;
+use std::io::{Read, Write};
+use std::fmt::Write as wrt;
 use std::process;
 use std::env;
 use std::thread;
@@ -51,17 +51,17 @@ fn get_mensagem(mut stream: TcpStream) ->String {
     return String::from_utf8_lossy(&buffer).to_string();
 }
 
-fn calcula(chave: String, power2_nodes: i32) {
-    let node_quantity = i32::pow(2, &power2_nodes);
+fn calcula(chave: &String, power2_nodes: &i32) -> i32 {
+    let node_quantity = i32::pow(2, power2_nodes as u32);
     let mut soma = 0;
 
     for byte in chave.as_bytes() {
         let mut hexstring = String::new();
-        write!(&mut hexstring, "{:x}", &byte).expect("Unable to write"); // converte de byte para hexstring
+        write!(&mut hexstring, "{:x}", &byte).expect("unable to write"); // converte de byte para hexstring
 
-        let byte_int = match i32::from_str_radix(s.as_str(), 16) { // converte de hexstring para inteiro
+        let byte_int = match i32::from_str_radix(hexstring.as_str(), 16) { // converte de hexstring para inteiro
             Ok(num) => num,
-            Err(_) => {println!("invalid temp argument"); process::exit(0x01);}
+            Err(_) => {println!("invalid hexstring"); process::exit(0x01);}
         };
 
         soma += byte_int; // adiciona o byte ao somador
@@ -70,22 +70,36 @@ fn calcula(chave: String, power2_nodes: i32) {
     return soma % node_quantity; // calcula o hash
 }
 
-fn roteia(no: i32, no_atual: i32, power2_nodes: i32, chave: String, tipo: String, valor_ou_endereco: String) {
-    let mut no_prox; // próximo nó
+fn roteia(no: i32, &no_atual: i32, &power2_nodes: i32, chave: &String, tipo: String, valor_ou_endereco: &String) {
+    let mut no_prox = -1; // próximo nó
 
     for i in 0..power2_nodes-1 { // calcula o próximo nó a ser visitado
-        let no_verifica = no_atual + i32::pow(2, &i);
+        let no_verifica = no_atual + i32::pow(2, i as u32);
         if no > no_pow { // se o nó verificado é menor que o destino, então deve-se ir ao no verificado anteriormente
             break;
         }
         no_prox = no_verifica;
     }
 
-    // faz conexão TCP com o próximo nó
+    if no_prox == -1 {
+       process::exit(0x01);
+    }
 
+    // faz conexão TCP com o próximo nó
+    let connection_port = (7000 + no_prox).to_string().as_str();
+    if let Ok(mut stream) = TcpStream::connect("127.0.0.1:".to_owned() + connection_port) {
+        let send = tipo.as_str() + "--" + chave.as_str() + "--" + valor_ou_endereco.as_str() + "--" + no.as_str();
+        let bufsend = send.as_bytes();
+
+        let res = stream.write(bufsend);
+        res.unwrap();
+    }
+    else {
+        println!("não consegui me conectar...");
+    }
 }
 
-fn trata(mensagem: String, node: i32, power2_nodes: i32) {
+fn trata(mensagem: String, node: &i32, power2_nodes: &i32) {
     /// Trata a mensagem, executando as funções abaixo para cada caso
     ///   "insere--chave--valor" -> chama *calcula*, e depois *roteia* ou *coloca*
     ///   "insere_no--chave--valor--no" -> chama *roteia* ou *coloca*
@@ -100,21 +114,36 @@ fn trata(mensagem: String, node: i32, power2_nodes: i32) {
     // decide para onde ir
     if m.starts_with("insere--") {
         if v.len() != 3 {println!("mensagem de insercao invalida !"); return;}
+
         let chave = v[1].to_string();
         let valor = v[2].to_string();
+        let next_node = calcula(&chave, power2_nodes);
+
+        if next_node == *node {
+            // coloca()
+        } else {
+            roteia(next_node, *node, *power2_nodes, &chave, "insere_no".into_string(), &valor);
+        }
         // TODO: chamar calcula, e depois roteia ou coloca
     }
     else if m.starts_with("insere_no") {
         if v.len() != 4 {println!("mensagem de insercao com no invalida !"); return;}
-        // let chave = v[1].to_string();
-        // let valor = v[2].to_string();
-        //let no = v[3].to_string();
+        let chave = v[1].to_string();
+        let valor = v[2].to_string();
+        let no = v[3].parse::<i32>().unwrap();
+
+        if no == *node {
+            // coloca()
+        } else {
+            roteia(no, *node, *power2_nodes, &chave, "insere_no".into_string(), &valor);
+        }
         // TODO: chamar roteia ou coloca
     }
     else if m.starts_with("consulta--") {
         if v.len() != 3 {println!("mensagem de insercao invalida !"); return;}
         // let valor = v[1].to_string();
         // let endereco = v[2].to_string();
+
         // TODO: chamar calcula, e depois roteia ou procura
     }
     else if m.starts_with("consulta_no") {
