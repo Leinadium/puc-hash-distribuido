@@ -60,7 +60,8 @@
         chama [callback] para ela
 
 ### Função *callback(valor, endereço)*: 
-    Envia para o endereço o valor encontrado, por TCP
+    Envia para o endereço o valor encontrado e o no onde estava, por TCP, no seguinte formato:
+        "valor--no"
 
 ## Exemplos
 
