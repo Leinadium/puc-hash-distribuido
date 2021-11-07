@@ -24,7 +24,7 @@ pub mod disthash {
         /// Envia um comando de fechar para cada servidor.
         let porta = 7000;
         let no = 0;
-        for i in 0..n {
+        for i in 0..n-1 {
             // envia a mensagem
             let mut stream = match TcpStream::connect(format!("127.0.0.1:{}", porta + i)) {
                 Ok(s) => s,
