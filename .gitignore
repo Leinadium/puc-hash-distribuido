@@ -6,3 +6,6 @@ debug/
 
 # IDEs
 .idea/
+
+# venv de python
+venv/
