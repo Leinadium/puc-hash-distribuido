@@ -73,11 +73,11 @@ fn main() {
         };
 
         let mut buffer = [0; 128];
-        match stream.read(&mut buffer) {
-            Ok(_) => {},
+        let size = match stream.read(&mut buffer) {
+            Ok(n) => {n},
             Err(e) => {println!("error processing callback {:?}", e); process::exit(0x01);}
-        }
-        let callback_m = String::from_utf8_lossy(&buffer).to_string();
+        };
+        let callback_m = String::from_utf8_lossy(&buffer[0..size]).to_string();
         let callback_m_safe = callback_m.replace("\\--", "--");
         let callback_v: Vec<&str> = callback_m_safe.split("--").collect();
 
