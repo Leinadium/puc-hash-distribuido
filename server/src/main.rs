@@ -9,7 +9,7 @@ use std::thread;
 use std::collections::HashMap;
 use std::process::exit;
 use std::sync::mpsc;
-use std::sync::mpsc::{Receiver, Sender, SendError, channel};
+use std::sync::mpsc::{Receiver, Sender};
 
 
 
@@ -55,7 +55,7 @@ fn calcula(chave: &String, power2_nodes: &i32) -> i32 {
     /// Calcula um hash para a chave para saber a qual nó enviar a mensagem
 
     // obtém a quantidade de nós da arquitetura
-    let node_quantity = i32::pow(2, power2_nodes as u32);
+    let node_quantity = i32::pow(2, *power2_nodes as u32);
 
     // inicializa o somador
     let mut soma = 0;
@@ -81,32 +81,37 @@ fn calcula(chave: &String, power2_nodes: &i32) -> i32 {
     return soma % node_quantity; // calcula o hash
 }
 
-fn roteia(no_destino: i32, &no_atual: i32, &power2_nodes: i32, chave: &String, tipo: String, valor_ou_endereco: &String) {
+fn roteia(no_destino: i32, no_atual: &i32, power2_nodes: &i32, chave: &String, tipo: String, valor_ou_endereco: &String) {
     /// Descobre qual o próximo nó que deve ser visitado e então faz uma conexão TCP para ele
     /// Considerou-se que as portas começam em 7001
 
     let mut no_prox = -1; // próximo nó
+    let node_quantity = i32::pow(2, *power2_nodes as u32);
+
+    // se o nó destino é menor que o nó atual, a soma do nó atual com as potências de 2 dará maior que 2^power2_nodes
+    // assim, para facilitar a lógica, pode-se complementar o nó procurado com o valor de node_quantity
+    let mut no_procurado = no_destino;
+    if no_destino < *no_atual {
+        no_procurado += node_quantity;
+    }
 
     // calcula o próximo nó a ser visitado
-    for i in 0..power2_nodes-1 {
+    for i in 0..*power2_nodes {
         let no_verifica = no_atual + i32::pow(2, i as u32); // no_atual + 2^i
 
         // se o nó verificado é menor que o destino, então deve-se ir ao no verificado anteriormente
-        if no_destino > no_pow {
+        if no_prox != -1 && no_verifica > no_procurado {
             break;
         }
         no_prox = no_verifica;
     }
-
-    if no_prox == -1 {
-       process::exit(0x01);
-    }
+    no_prox = no_prox % node_quantity;
 
     // faz conexão TCP com o próximo nó
-    let connection_port = (7000 + no_prox).to_string().as_str();
-    if let Ok(mut stream) = TcpStream::connect("127.0.0.1:".to_owned() + connection_port) {
+    let connection_port = 7000 + no_prox;
+    if let Ok(mut stream) = TcpStream::connect(format!("127.0.0.1:{}", connection_port)) {
         // prepara a mensagem
-        let message = tipo.as_str() + "--" + chave.as_str() + "--" + valor_ou_endereco.as_str() + "--" + no_destino.as_str();
+        let message = format!("{}--{}--{}--{}", tipo, chave, valor_ou_endereco, no_destino);
         let bufsend = message.as_bytes();
 
         // envia a mensagem
@@ -119,7 +124,19 @@ fn roteia(no_destino: i32, &no_atual: i32, &power2_nodes: i32, chave: &String, t
 }
 
 fn callback(valor: &String, endereco: &String) {
+    let address = endereco.clone();
 
+    if let Ok(mut stream) = TcpStream::connect(address) {
+        // prepara a mensagem
+        let bufsend = valor.as_bytes();
+
+        // envia a mensagem
+        let res = stream.write(bufsend);
+        res.unwrap();
+    }
+    else {
+        println!("não consegui me conectar ao endereço informado pelo cliente...");
+    }
 }
 
 fn coloca(chave: &String, valor: &String, tx_sender: Sender<SendHash>) {
@@ -127,8 +144,8 @@ fn coloca(chave: &String, valor: &String, tx_sender: Sender<SendHash>) {
     /// Se forem recebidos endereços que estavam esperando a inserção desse conjunto chave-valor, faz um callback para eles.
 
     // faz o clone para envio da chave e do valor
-    let key = *chave.clone();
-    let value = *valor.clone();
+    let key = (*chave.clone()).to_string();
+    let value = (*valor.clone()).to_string();
 
     // cria o canal de comunicação de resposta
     let (sender, receiver) = mpsc::channel();
@@ -158,14 +175,14 @@ fn procura(chave: &String, endereco: &String, tx_sender: Sender<SendHash>) {
     /// Se encontrado, faz um callback para o endereço que solicitou, senão deixa o endereço aguardando uma resposta.
 
     // faz o clone para envio da chave e do endereço
-    let key = *chave.clone();
-    let address = *endereco.clone();
+    let key = (*chave.clone()).to_string();
+    let address = (*endereco.clone()).to_string();
 
     // cria o canal de comunicação de resposta
     let (sender, receiver) = mpsc::channel();
 
     // prepara a hash de envio e envia
-    let send_hash = SendHash {tipo: false, chave: key.to_string(), valor: "".to_string(), endereco: address.to_string(), tx_resposta: sender};
+    let send_hash = SendHash {tipo: false, chave: key, valor: "".to_string(), endereco: address, tx_resposta: sender};
     tx_sender.send(send_hash).expect("procura: erro no envio");
 
     // obtém a resposta
@@ -180,7 +197,7 @@ fn procura(chave: &String, endereco: &String, tx_sender: Sender<SendHash>) {
 
     // se encontrar a chave, realiza um callback para o endereço que solicitou a procura
     if response_hash.sucesso {
-        callback(valor, &endereco);
+        callback(&response_hash.valor, &endereco);
     }
 }
 
@@ -188,8 +205,8 @@ fn trata(mensagem: String, node: &i32, power2_nodes: &i32, tx_sender: Sender<Sen
     /// Trata a mensagem, executando as funções abaixo para cada caso
     ///   "insere--chave--valor" -> chama *calcula*, e depois *roteia* ou *coloca*
     ///   "insere_no--chave--valor--no" -> chama *roteia* ou *coloca*
-    ///   "consulta--valor--endereço" -> chama *calcula*, e depois *roteia* ou *procura*
-    ///   "consulta_no--valor--no--endereco" -> chama *roteia* ou *procura*
+    ///   "consulta--chave--endereço" -> chama *calcula*, e depois *roteia* ou *procura*
+    ///   "consulta_no--chave--no--endereco" -> chama *roteia* ou *procura*
     ///   "fecha" -> fecha o servidor
 
     // retira os escapes
@@ -209,7 +226,7 @@ fn trata(mensagem: String, node: &i32, power2_nodes: &i32, tx_sender: Sender<Sen
         if next_node == *node {
             coloca(&chave, &valor, tx_sender);
         } else {
-            roteia(next_node, *node, *power2_nodes, &chave, "insere_no".into_string(), &valor);
+            roteia(next_node, node, power2_nodes, &chave, "insere_no".to_string(), &valor);
         }
     }
     else if m.starts_with("insere_no") {
@@ -223,35 +240,35 @@ fn trata(mensagem: String, node: &i32, power2_nodes: &i32, tx_sender: Sender<Sen
         if no_destino == *node {
             coloca(&chave, &valor, tx_sender);
         } else {
-            roteia(no_destino, *node, *power2_nodes, &chave, "insere_no".into_string(), &valor);
+            roteia(no_destino, node, power2_nodes, &chave, "insere_no".to_string(), &valor);
         }
     }
     else if m.starts_with("consulta--") {
         // chama calcula, e depois roteia ou procura
 
         if v.len() != 3 {println!("mensagem de insercao invalida !"); return;}
-        let valor = v[1].to_string();
+        let chave = v[1].to_string();
         let endereco = v[2].to_string();
         let next_node = calcula(&chave, power2_nodes);
 
         if next_node == *node {
             procura(&chave, &endereco, tx_sender);
         } else {
-            roteia(next_node, *node, *power2_nodes, &chave, "insere_no".into_string(), &valor);
+            roteia(next_node, node, power2_nodes, &chave, "insere_no".to_string(), &endereco);
         }
     }
     else if m.starts_with("consulta_no") {
         // chama roteia ou procura
 
         if v.len() != 4 {println!("mensagem de insercao com no invalida !"); return;}
-        let valor = v[1].to_string();
+        let chave = v[1].to_string();
         let endereco = v[2].to_string();
         let no_destino = v[3].parse::<i32>().unwrap();
 
         if no_destino == *node {
             procura(&chave, &endereco, tx_sender);
         } else {
-            roteia(no_destino, *node, *power2_nodes, &chave, "insere_no".into_string(), &valor);
+            roteia(no_destino, node, power2_nodes, &chave, "insere_no".to_string(), &endereco);
         }
     }
     else if m.starts_with("fecha") {
@@ -272,7 +289,7 @@ fn loop_hash(receiver: Receiver<SendHash>) {
     let mut hashmap: HashMap<String, String> = HashMap::new();
     let mut espera_list: Vec<EsperaHash> = Vec::new();
 
-    println!("hashloop: listening for operations");
+    // println!("hashloop: listening for operations");
     loop {
         let m = receiver.recv();
         let mensagem_hash = match m {
@@ -282,7 +299,7 @@ fn loop_hash(receiver: Receiver<SendHash>) {
                 break ;     // erro, fecha o loop
             },
         };
-        println!("hashloop: parsing message");
+        // println!("hashloop: parsing message");
         let mut response = ResponseHash { sucesso: true, valor: "".to_string(), vetor: Vec::new() };
 
         // procura na hashmap
@@ -310,7 +327,7 @@ fn loop_hash(receiver: Receiver<SendHash>) {
             espera_list.retain(|x| *x.content != mensagem_hash.chave);
 
         }
-        println!("hashloop: finished parsing");
+        // println!("hashloop: finished parsing");
         mensagem_hash.tx_resposta.send(response).expect("hashloop: callback fail");
     }
 }
@@ -323,9 +340,9 @@ fn main() {
         println!("usage: {} node_number port power2_nodes", &args[0]);
         process::exit(0x01);
     }
-    let temp_node = &args[1].parse::<i32>();
-    let temp_port = &args[2].parse::<i32>();
-    let temp_power2_nodes = &args[3].parse::<i32>();
+    let temp_node = args[1].parse::<i32>();
+    let temp_port = args[2].parse::<i32>();
+    let temp_power2_nodes = args[3].parse::<i32>();
 
     let node = match temp_node {
         Ok(num) => num,
@@ -341,9 +358,9 @@ fn main() {
     };
 
     // criando o hash
-    println!("creating channel for hash_loop");
+    // println!("creating channel for hash_loop");
     let (tx_hash, rx_hash) = mpsc::channel();
-    println!("starting hash thread");
+    // println!("starting hash thread");
     thread::spawn(move|| { loop_hash(rx_hash); });
 
 
@@ -352,10 +369,10 @@ fn main() {
     println!("node {} running on port {}", node, port);
     for stream in listener.incoming() {
         let stream = stream.unwrap();
-        println!("new conn: {}", stream.peer_addr().unwrap());
+        // println!("new conn: {}", stream.peer_addr().unwrap());
         let mensagem = get_mensagem(stream);
         let tx_sender = tx_hash.clone();
         // trata a mensagem
-        thread::spawn(move || {trata(mensagem, node, power2_nodes, tx_sender); });
+        thread::spawn(move || {trata(mensagem, &node, &power2_nodes, tx_sender); });
     }
 }
