@@ -69,9 +69,9 @@ Para executar o script de testes, execute o script em código rust do diretório
 ```bash
 cd tests
 cargo build --release
-./run 1
-./run 2
-./run 3
+./tests 1
+./tests 2
+./tests 3
 ```
 Cada run é seguido pelo testcase.
 Testamos os casos:
