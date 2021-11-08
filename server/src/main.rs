@@ -111,7 +111,8 @@ fn roteia(no_destino: i32, no_atual: &i32, power2_nodes: &i32, chave: &String, t
     let connection_port = 7000 + no_prox;
     if let Ok(mut stream) = TcpStream::connect(format!("127.0.0.1:{}", connection_port)) {
         // prepara a mensagem
-        let message = format!("{}--{}--{}--{}", tipo, chave, valor_ou_endereco, no_destino);
+        println!("{}", no_destino);
+        let message = format!("{}--{}--{}--{}", tipo, chave, valor_ou_endereco, no_destino.to_string());
         let bufsend = message.as_bytes();
 
         // envia a mensagem
@@ -232,7 +233,7 @@ fn trata(mensagem: String, node: &i32, power2_nodes: &i32, tx_sender: Sender<Sen
     else if m.starts_with("insere_no") {
         // chama roteia ou coloca
 
-        if v.len() != 4 {println!("mensagem de insercao com no invalida !"); return;}
+        if v.len() != 4 {println!("mensagem de insercao com no invalida !"); println!("{}", m); return;} // TODO TODO
         let chave = v[1].to_string();
         let valor = v[2].to_string();
         let no_destino = v[3].parse::<i32>().unwrap();
@@ -246,7 +247,7 @@ fn trata(mensagem: String, node: &i32, power2_nodes: &i32, tx_sender: Sender<Sen
     else if m.starts_with("consulta--") {
         // chama calcula, e depois roteia ou procura
 
-        if v.len() != 3 {println!("mensagem de insercao invalida !"); return;}
+        if v.len() != 3 {println!("mensagem de consulta invalida !"); return;}
         let chave = v[1].to_string();
         let endereco = v[2].to_string();
         let next_node = calcula(&chave, power2_nodes);
@@ -260,7 +261,7 @@ fn trata(mensagem: String, node: &i32, power2_nodes: &i32, tx_sender: Sender<Sen
     else if m.starts_with("consulta_no") {
         // chama roteia ou procura
 
-        if v.len() != 4 {println!("mensagem de insercao com no invalida !"); return;}
+        if v.len() != 4 {println!("mensagem de consulta com no invalida !"); println!("{}", m); return;}
         let chave = v[1].to_string();
         let endereco = v[2].to_string();
         let no_destino = v[3].parse::<i32>().unwrap();
@@ -268,7 +269,7 @@ fn trata(mensagem: String, node: &i32, power2_nodes: &i32, tx_sender: Sender<Sen
         if no_destino == *node {
             procura(&chave, &endereco, tx_sender);
         } else {
-            roteia(no_destino, node, power2_nodes, &chave, "insere_no".to_string(), &endereco);
+            roteia(no_destino, node, power2_nodes, &chave, "consulta_no".to_string(), &endereco);
         }
     }
     else if m.starts_with("fecha") {
@@ -367,8 +368,11 @@ fn main() {
     // iniciando listener TCP
     let listener = TcpListener::bind(format!("127.0.0.1:{}", port)).unwrap();
     println!("node {} running on port {}", node, port);
-    for stream in listener.incoming() {
-        let stream = stream.unwrap();
+    for stream_enum in listener.incoming() {
+        let stream = match stream_enum {
+            Ok(s) => s,
+            Err(_) => { println!("cannot process stream, probably server is closing"); exit(0); }
+        };
         // println!("new conn: {}", stream.peer_addr().unwrap());
         let mensagem = get_mensagem(stream);
         let tx_sender = tx_hash.clone();
