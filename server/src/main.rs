@@ -111,9 +111,7 @@ fn roteia(no_destino: i32, no_atual: &i32, power2_nodes: &i32, chave: &String, t
     let connection_port = 7000 + no_prox;
     if let Ok(mut stream) = TcpStream::connect(format!("127.0.0.1:{}", connection_port)) {
         // prepara a mensagem
-        println!("{}", no_destino);
         let message = format!("{}--{}--{}--{}", tipo, chave, valor_ou_endereco, no_destino);
-        println!("{}", message);
         let bufsend = message.as_bytes();
 
         // envia a mensagem
