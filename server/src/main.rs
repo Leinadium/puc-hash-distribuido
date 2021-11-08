@@ -125,12 +125,13 @@ fn roteia(no_destino: i32, no_atual: &i32, power2_nodes: &i32, chave: &String, t
     }
 }
 
-fn callback(valor: &String, endereco: &String) {
+fn callback(valor: &String, endereco: &String, no_atual: &i32) {
     let address = endereco.clone();
 
     if let Ok(mut stream) = TcpStream::connect(address) {
         // prepara a mensagem
-        let bufsend = valor.as_bytes();
+        let message = format!("{}--{}", valor, no_atual);
+        let bufsend = message.as_bytes();
 
         // envia a mensagem
         let res = stream.write(bufsend);
@@ -141,7 +142,7 @@ fn callback(valor: &String, endereco: &String) {
     }
 }
 
-fn coloca(chave: &String, valor: &String, tx_sender: Sender<SendHash>) {
+fn coloca(chave: &String, valor: &String, no_atual: &i32, tx_sender: Sender<SendHash>) {
     /// Envia uma mensagem por um canal direto com uma thread que coloca o conjunto chave-valor na hashmap desse servidor.
     /// Se forem recebidos endereços que estavam esperando a inserção desse conjunto chave-valor, faz um callback para eles.
 
@@ -168,11 +169,11 @@ fn coloca(chave: &String, valor: &String, tx_sender: Sender<SendHash>) {
 
     // se houverem endereços esperando resposta, realiza um callback para eles
     for endereco in response_hash.vetor {
-        callback(valor, &endereco);
+        callback(valor, &endereco, no_atual);
     }
 }
 
-fn procura(chave: &String, endereco: &String, tx_sender: Sender<SendHash>) {
+fn procura(chave: &String, endereco: &String, no_atual: &i32, tx_sender: Sender<SendHash>) {
     /// Envia uma mensagem por um canal direto com uma thread que procura o conjunto chave-valor na hashmap desse servidor.
     /// Se encontrado, faz um callback para o endereço que solicitou, senão deixa o endereço aguardando uma resposta.
 
@@ -199,7 +200,7 @@ fn procura(chave: &String, endereco: &String, tx_sender: Sender<SendHash>) {
 
     // se encontrar a chave, realiza um callback para o endereço que solicitou a procura
     if response_hash.sucesso {
-        callback(&response_hash.valor, &endereco);
+        callback(&response_hash.valor, &endereco, no_atual);
     }
 }
 
@@ -213,7 +214,7 @@ fn trata(mensagem: String, node: &i32, power2_nodes: &i32, tx_sender: Sender<Sen
 
     // retira os escapes
     let m = mensagem.replace("\\--", "--");
-    println!("{}", m);
+    // println!("{}", m);
     let v: Vec<&str> = m.split("--").collect();
 
     // decide para onde ir
@@ -227,7 +228,7 @@ fn trata(mensagem: String, node: &i32, power2_nodes: &i32, tx_sender: Sender<Sen
         let next_node = calcula(&chave, power2_nodes);
 
         if next_node == *node {
-            coloca(&chave, &valor, tx_sender);
+            coloca(&chave, &valor, node, tx_sender);
         } else {
             roteia(next_node, node, power2_nodes, &chave, "insere_no".to_string(), &valor);
         }
@@ -235,13 +236,13 @@ fn trata(mensagem: String, node: &i32, power2_nodes: &i32, tx_sender: Sender<Sen
     else if m.starts_with("insere_no") {
         // chama roteia ou coloca
 
-        if v.len() != 4 {println!("mensagem de insercao com no invalida !"); println!("{}", m); return;} // TODO TODO
+        if v.len() != 4 {println!("mensagem de insercao com no invalida !"); return;} // TODO TODO
         let chave = v[1].to_string();
         let valor = v[2].to_string();
         let no_destino = v[3].parse::<i32>().unwrap();
 
         if no_destino == *node {
-            coloca(&chave, &valor, tx_sender);
+            coloca(&chave, &valor, node, tx_sender);
         } else {
             roteia(no_destino, node, power2_nodes, &chave, "insere_no".to_string(), &valor);
         }
@@ -255,7 +256,7 @@ fn trata(mensagem: String, node: &i32, power2_nodes: &i32, tx_sender: Sender<Sen
         let next_node = calcula(&chave, power2_nodes);
 
         if next_node == *node {
-            procura(&chave, &endereco, tx_sender);
+            procura(&chave, &endereco, node, tx_sender);
         } else {
             roteia(next_node, node, power2_nodes, &chave, "consulta_no".to_string(), &endereco);
         }
@@ -263,13 +264,13 @@ fn trata(mensagem: String, node: &i32, power2_nodes: &i32, tx_sender: Sender<Sen
     else if m.starts_with("consulta_no") {
         // chama roteia ou procura
 
-        if v.len() != 4 {println!("mensagem de consulta com no invalida !"); println!("{}", m); return;}
+        if v.len() != 4 {println!("mensagem de consulta com no invalida !"); return;}
         let chave = v[1].to_string();
         let endereco = v[2].to_string();
         let no_destino = v[3].parse::<i32>().unwrap();
 
         if no_destino == *node {
-            procura(&chave, &endereco, tx_sender);
+            procura(&chave, &endereco, node, tx_sender);
         } else {
             roteia(no_destino, node, power2_nodes, &chave, "consulta_no".to_string(), &endereco);
         }
