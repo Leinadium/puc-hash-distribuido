@@ -39,7 +39,7 @@ struct EsperaHash {
 fn get_mensagem(mut stream: TcpStream) ->String {
     let mut buffer = [0; 128];
 
-    let _ = match stream.read(&mut buffer) {
+    let size = match stream.read(&mut buffer) {
         Ok(num) => num,
         Err(_) => {println!("error processing message"); 0},
     };
@@ -48,7 +48,7 @@ fn get_mensagem(mut stream: TcpStream) ->String {
         Err(_) => {println!("error closing stream"); process::exit(0x01);}
     }
 
-    return String::from_utf8_lossy(&buffer).to_string();
+    return String::from_utf8_lossy(&buffer[0..size]).to_string();
 }
 
 fn calcula(chave: &String, power2_nodes: &i32) -> i32 {
@@ -112,7 +112,8 @@ fn roteia(no_destino: i32, no_atual: &i32, power2_nodes: &i32, chave: &String, t
     if let Ok(mut stream) = TcpStream::connect(format!("127.0.0.1:{}", connection_port)) {
         // prepara a mensagem
         println!("{}", no_destino);
-        let message = format!("{}--{}--{}--{}", tipo, chave, valor_ou_endereco, no_destino.to_string());
+        let message = format!("{}--{}--{}--{}", tipo, chave, valor_ou_endereco, no_destino);
+        println!("{}", message);
         let bufsend = message.as_bytes();
 
         // envia a mensagem
@@ -212,6 +213,7 @@ fn trata(mensagem: String, node: &i32, power2_nodes: &i32, tx_sender: Sender<Sen
 
     // retira os escapes
     let m = mensagem.replace("\\--", "--");
+    println!("{}", m);
     let v: Vec<&str> = m.split("--").collect();
 
     // decide para onde ir
@@ -255,7 +257,7 @@ fn trata(mensagem: String, node: &i32, power2_nodes: &i32, tx_sender: Sender<Sen
         if next_node == *node {
             procura(&chave, &endereco, tx_sender);
         } else {
-            roteia(next_node, node, power2_nodes, &chave, "insere_no".to_string(), &endereco);
+            roteia(next_node, node, power2_nodes, &chave, "consulta_no".to_string(), &endereco);
         }
     }
     else if m.starts_with("consulta_no") {
