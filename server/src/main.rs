@@ -372,7 +372,9 @@ fn main() {
     for stream_enum in listener.incoming() {
         let stream = match stream_enum {
             Ok(s) => s,
-            Err(_) => { println!("cannot process stream, probably server is closing"); exit(0); }
+            Err(_) => {
+                // println!("closing server (by listener blocking call error)");
+                exit(0); }
         };
         // println!("new conn: {}", stream.peer_addr().unwrap());
         let mensagem = get_mensagem(stream);
