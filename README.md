@@ -65,4 +65,16 @@ Para rodar um client, execute client passando como argumentos uma das três poss
 
 ## Testes
 
-Para executar o script de testes, execute o script ```teste.py``` 
+Para executar o script de testes, execute o script em código rust do diretório tests pelo comando:
+```bash
+cd tests
+cargo build --release
+./run 1
+./run 2
+./run 3
+```
+Cada run é seguido pelo testcase.
+Testamos os casos:
+1. Em que são criados 16 nós, então insere e consulta.
+2. Em que são criados 16 nós, então tenta consultar e insere.
+3. Em que são criados 32 nós, então insere e consulta desordenadamente concorrentemente.
