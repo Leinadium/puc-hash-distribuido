@@ -202,6 +202,11 @@ fn procura(chave: &String, endereco: &String, no_atual: &i32, tx_sender: Sender<
     }
 }
 
+fn verifica_fechar(mensagem: &String) -> bool {
+    /// Verifica se a mensagem é para fechar o servidor
+    mensagem.starts_with("fecha")
+}
+
 fn trata(mensagem: String, node: &i32, power2_nodes: &i32, tx_sender: Sender<SendHash>) {
     /// Trata a mensagem, executando as funções abaixo para cada caso
     ///   "insere--chave--valor" -> chama *calcula*, e depois *roteia* ou *coloca*
@@ -378,6 +383,8 @@ fn main() {
         };
         // println!("new conn: {}", stream.peer_addr().unwrap());
         let mensagem = get_mensagem(stream);
+        if verifica_fechar(&mensagem) {break;}
+
         let tx_sender = tx_hash.clone();
         // trata a mensagem
         thread::spawn(move || {trata(mensagem, &node, &power2_nodes, tx_sender); });
