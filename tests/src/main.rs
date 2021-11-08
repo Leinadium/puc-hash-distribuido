@@ -32,13 +32,16 @@ fn test_case_1() {
     /// Clientes: Testa o envio de mensagens para cada um dos 16 nós e então a procura
     let mut process_vec = Vec::new();
     process_vec = create_server_ring(process_vec, 4);
+    sleep(Duration::new(3,0));
     process_vec = create_client_insere(process_vec, 3, "teste".to_string(), "teste".to_string());
+    sleep(Duration::new(3,0));
     process_vec = create_client_consulta(process_vec, 3, "teste".to_string());
+    sleep(Duration::new(10,0));
     process_vec = create_client_fechar(process_vec, 16);
 
     // espera até todas as childs acabarem
     for mut child in process_vec {
-        child.wait();
+        child.wait().unwrap();
     };
 }
 
