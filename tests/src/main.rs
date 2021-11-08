@@ -51,9 +51,9 @@ fn test_case_2() {
     let mut process_vec = Vec::new();
     process_vec = create_server_ring(process_vec, 4);
     sleep(Duration::new(3,0));
-    process_vec = create_client_insere(process_vec, 3, "teste".to_string(), "teste".to_string());
+    process_vec = create_client_consulta(process_vec, 2, "teste".to_string());
     sleep(Duration::new(3,0));
-    process_vec = create_client_consulta(process_vec, 3, "teste".to_string());
+    process_vec = create_client_insere(process_vec, 7, "teste".to_string(), "teste".to_string());
     sleep(Duration::new(10,0));
     process_vec = create_client_fechar(process_vec, 16);
 
@@ -70,7 +70,7 @@ fn test_case_3() {
     let string_vec = vec!["teste1".to_string(), "teste2".to_string(), "teste3".to_string(), "teste4".to_string(), "teste5".to_string()];
 
     // cria os nós do servidor
-    process_vec = create_server_ring(process_vec, 4);
+    process_vec = create_server_ring(process_vec, 5);
     sleep(Duration::new(3,0));
 
     // começa a consultar e inserir desordenadamente (todas as consultas tem de funcionar eventualmente)
