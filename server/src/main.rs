@@ -234,7 +234,7 @@ fn trata(mensagem: String, node: &i32, power2_nodes: &i32, tx_sender: Sender<Sen
     else if m.starts_with("insere_no") {
         // chama roteia ou coloca
 
-        if v.len() != 4 {println!("mensagem de insercao com no invalida !"); return;} // TODO TODO
+        if v.len() != 4 {println!("mensagem de insercao com no invalida !"); return;}
         let chave = v[1].to_string();
         let valor = v[2].to_string();
         let no_destino = v[3].parse::<i32>().unwrap();

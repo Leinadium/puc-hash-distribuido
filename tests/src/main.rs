@@ -29,7 +29,7 @@ fn create_client_consulta(mut process_vec: Vec<Child>, no: i32, chave: String) -
 
 fn test_case_1() {
     /// Servidor: Testa a criação de um anel servidor de 16 nós
-    /// Clientes: Testa o envio de mensagens para cada um dos 16 nós e então a procura
+    /// Clientes: Testa uma inserção e uma consulta
     let mut process_vec = Vec::new();
     process_vec = create_server_ring(process_vec, 4);
     sleep(Duration::new(3,0));
@@ -37,6 +37,53 @@ fn test_case_1() {
     sleep(Duration::new(3,0));
     process_vec = create_client_consulta(process_vec, 3, "teste".to_string());
     sleep(Duration::new(10,0));
+    process_vec = create_client_fechar(process_vec, 16);
+
+    // espera até todas as childs acabarem
+    for mut child in process_vec {
+        child.wait().unwrap();
+    };
+}
+
+fn test_case_2() {
+    /// Servidor: Testa a criação de um anel servidor de 16 nós
+    /// Clientes: Testa uma consulta antes de ter a chave e então insere
+    let mut process_vec = Vec::new();
+    process_vec = create_server_ring(process_vec, 4);
+    sleep(Duration::new(3,0));
+    process_vec = create_client_insere(process_vec, 3, "teste".to_string(), "teste".to_string());
+    sleep(Duration::new(3,0));
+    process_vec = create_client_consulta(process_vec, 3, "teste".to_string());
+    sleep(Duration::new(10,0));
+    process_vec = create_client_fechar(process_vec, 16);
+
+    // espera até todas as childs acabarem
+    for mut child in process_vec {
+        child.wait().unwrap();
+    };
+}
+
+fn test_case_3() {
+    /// Servidor: Testa a criação de um anel servidor de 32 nós
+    /// Clientes: Testa uma inserção por vários nós e faz consultas das chaves simultâneamente e desordenadamente
+    let mut process_vec = Vec::new();
+    let string_vec = vec!["teste1".to_string(), "teste2".to_string(), "teste3".to_string(), "teste4".to_string(), "teste5".to_string()];
+
+    // cria os nós do servidor
+    process_vec = create_server_ring(process_vec, 4);
+    sleep(Duration::new(3,0));
+
+    // começa a consultar e inserir desordenadamente (todas as consultas tem de funcionar eventualmente)
+    process_vec = create_client_consulta(process_vec, 22, string_vec.get(3).unwrap().clone());
+    process_vec = create_client_consulta(process_vec, 31, string_vec.get(2).unwrap().clone());
+    process_vec = create_client_insere(process_vec, 0, string_vec.get(0).unwrap().clone(), "1".to_string());
+    process_vec = create_client_insere(process_vec, 17, string_vec.get(1).unwrap().clone(), "2".to_string());
+    process_vec = create_client_consulta(process_vec, 15, string_vec.get(1).unwrap().clone());
+    process_vec = create_client_insere(process_vec, 12, string_vec.get(2).unwrap().clone(), "3".to_string());
+    process_vec = create_client_consulta(process_vec, 4, string_vec.get(0).unwrap().clone());
+    process_vec = create_client_insere(process_vec, 25, string_vec.get(3).unwrap().clone(), "4".to_string());
+
+    sleep(Duration::new(5,0));
     process_vec = create_client_fechar(process_vec, 16);
 
     // espera até todas as childs acabarem
@@ -60,9 +107,8 @@ fn main() {
     println!("teste run");
     match test_number {
         1 => test_case_1(),
-        // 2 => test_case_2(),
-        // 3 => test_case_3(),
-        // 4 => test_case_4(),
-        _ => println!("There are only 4 tests available")
+        2 => test_case_2(),
+        3 => test_case_3(),
+        _ => println!("There are only 3 tests available")
     }
 }
